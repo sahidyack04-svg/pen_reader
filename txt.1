@@ -1,0 +1,97 @@
+import cv2
+import pytesseract
+import pyttsx3
+import time
+
+# -------------------------------
+# Function to speak text
+# -------------------------------
+def speak(text):
+    engine = pyttsx3.init('sapi5')
+    voices = engine.getProperty('voices')
+    engine.setProperty('voice', voices[0].id)
+    engine.setProperty('rate', 150)
+    engine.setProperty('volume', 1.0)
+
+    # Clean text and split into smaller parts
+    text = text.replace("\n", " ").strip()
+    if not text:
+        print("Nothing to speak.")
+        return
+
+    print(text)
+    chunks = text.split(". ")
+    for chunk in chunks:
+        engine.say(chunk)
+        engine.runAndWait()
+        time.sleep(0.2)  # small pause between chunks
+
+# -------------------------------
+# Welcome message
+# -------------------------------
+speak("Welcome to Talking Pen!")
+
+# -------------------------------
+# Configure Tesseract OCR
+# -------------------------------
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+# -------------------------------
+# Mouse callback for snipping
+# -------------------------------
+ref_point = []
+cropping = False
+
+def click_and_crop(event, x, y, flags, param):
+    global ref_point, cropping
+    if event == cv2.EVENT_LBUTTONDOWN:
+        ref_point = [(x, y)]
+        cropping = True
+    elif event == cv2.EVENT_LBUTTONUP:
+        ref_point.append((x, y))
+        cropping = False
+
+# -------------------------------
+# Open webcam
+# -------------------------------
+cap = cv2.VideoCapture(0)
+cv2.namedWindow("Talking Pen - Press 's' to capture")
+cv2.setMouseCallback("Talking Pen - Press 's' to capture", click_and_crop)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    if len(ref_point) == 2:
+        cv2.rectangle(frame, ref_point[0], ref_point[1], (0, 255, 0), 2)
+
+    cv2.imshow("Talking Pen - Press 's' to capture", frame)
+    key = cv2.waitKey(1) & 0xFF
+
+    if key == ord("s") and len(ref_point) == 2:
+        x1, y1 = ref_point[0]
+        x2, y2 = ref_point[1]
+        roi = frame[y1:y2, x1:x2]
+        cv2.imwrite("roi.png", roi)
+        break
+
+    if key == ord("q"):
+        cap.release()
+        cv2.destroyAllWindows()
+        exit()
+
+cap.release()
+cv2.destroyAllWindows()
+
+# -------------------------------
+# OCR on selected region
+# -------------------------------
+roi_image = cv2.imread("roi.png")
+text = pytesseract.image_to_string(roi_image, lang='eng')
+
+if text.strip():
+    speak("Detected text is:")
+    speak(text)
+else:
+    speak("No text detected.")
