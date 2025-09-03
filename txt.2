@@ -1,0 +1,117 @@
+import cv2
+import pytesseract
+import pyttsx3
+import time
+import re
+
+# -------------------------------
+# CONFIG
+# -------------------------------
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+# -------------------------------
+# Init TTS
+# -------------------------------
+def get_tts_engine():
+    engine = pyttsx3.init("sapi5")   # force Windows speech API
+    engine.setProperty("rate", 150)
+    engine.setProperty("volume", 1.0)
+    voices = engine.getProperty("voices")
+    if voices:
+        engine.setProperty("voice", voices[0].id)
+    return engine
+
+def speak(text):
+    """Speak text with pyttsx3"""
+    if not text.strip():
+        return
+    engine = get_tts_engine()
+    print("🔊 Speaking:", text)
+    engine.say(text)
+    engine.runAndWait()
+    engine.stop()
+
+# -------------------------------
+# Mouse Crop
+# -------------------------------
+ref_point = []
+cropping = False
+
+def click_and_crop(event, x, y, flags, param):
+    global ref_point, cropping
+    if event == cv2.EVENT_LBUTTONDOWN:
+        ref_point = [(x, y)]
+        cropping = True
+    elif event == cv2.EVENT_LBUTTONUP:
+        ref_point.append((x, y))
+        cropping = False
+
+# -------------------------------
+# Welcome
+# -------------------------------
+speak("Welcome to Talking Pen!")
+
+# -------------------------------
+# Start Camera
+# -------------------------------
+cap = cv2.VideoCapture(0)
+winname = "Talking Pen - Draw box, press 's' to scan, 'q' to quit"
+cv2.namedWindow(winname)
+cv2.setMouseCallback(winname, click_and_crop)
+
+print("👉 Draw a box with mouse on the webcam, then press 's' to scan.")
+
+roi = None
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    if len(ref_point) == 2:
+        cv2.rectangle(frame, ref_point[0], ref_point[1], (0, 255, 0), 2)
+
+    cv2.imshow(winname, frame)
+    key = cv2.waitKey(1) & 0xFF
+
+    if key == ord("s") and len(ref_point) == 2:
+        (x1, y1), (x2, y2) = ref_point
+        x1, x2 = sorted((x1, x2))
+        y1, y2 = sorted((y1, y2))
+        roi = frame[y1:y2, x1:x2]
+        break
+
+    if key == ord("q"):
+        cap.release()
+        cv2.destroyAllWindows()
+        exit()
+
+cap.release()
+cv2.destroyAllWindows()
+
+# -------------------------------
+# OCR Processing
+# -------------------------------
+if roi is not None:
+    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    text = pytesseract.image_to_string(gray, lang="eng", config="--oem 3 --psm 6")
+
+    # Clean text
+    text = text.replace("\n", " ").strip()
+    text = re.sub(r"\s+", " ", text)
+
+    if text:
+        speak("Detected text is")
+
+        # Letter by letter
+        speak("Reading letter by letter")
+        for char in text:
+            if char.strip():
+                print("🔠 Letter:", char)
+                speak(char)
+                time.sleep(0.1)
+
+        # Whole sentence
+        speak("Now reading the whole sentence")
+        speak(text)
+    else:
+        speak("No text detected.")
