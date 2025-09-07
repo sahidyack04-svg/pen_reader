@@ -1,3 +1,6 @@
-A Python tool that lets you snip text with your webcam and hear it read aloud instantly.
-It greets you with “Welcome to Talking Pen!” and speaks letter by letter, then the full sentence.
+Hi everyone,  
+This is our Talking Pen project! 🎙️  
+We’re building a Python-based application that can scan any text and read it aloud.  
+The project leverages open-source libraries such as OCR, Whisper TTS, GTTS, and more to bring text-to-speech to life.  
 
+sahidyaack04@gmail.com
